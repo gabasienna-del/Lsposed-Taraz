@@ -42,8 +42,8 @@ android {
 }
 
 dependencies {
-    compileOnly 'de.robv.android.xposed:api:82'
-    compileOnly 'de.robv.android.xposed:api:82:sources'
+    // Локальный Xposed API JAR (который ты добавил в app/libs/)
+    implementation files('libs/api-82.jar')
     
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
