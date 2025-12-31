@@ -1,13 +1,10 @@
-# Xposed framework classes
+# Xposed framework
 -keep class de.robv.android.xposed.** { *; }
 -keepclassmembers class de.robv.android.xposed.** { *; }
 
-# Our module classes
+# Our module
 -keep class com.indriverbot.** { *; }
 -keepclassmembers class com.indriverbot.** { *; }
 
-# Xposed entry points
+# Xposed entry point
 -keep class * implements de.robv.android.xposed.IXposedHookLoadPackage { *; }
--keepclasseswithmembers class * {
-    public void handleLoadPackage(de.robv.android.xposed.callbacks.XC_LoadPackage$LoadPackageParam);
-}

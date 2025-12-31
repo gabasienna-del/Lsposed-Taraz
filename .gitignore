@@ -9,7 +9,7 @@ local.properties
 *.zip
 *.jar
 
-gradle/wrapper/*.zip
-gradle/wrapper/*.jar
+# Gradle
+.gradle/
+gradle/wrapper/gradle-*.zip
 !gradle/wrapper/gradle-wrapper.properties
-!gradle/wrapper/.gitkeep
