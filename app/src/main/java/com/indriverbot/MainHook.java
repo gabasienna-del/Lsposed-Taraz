@@ -10,17 +10,19 @@ public class MainHook implements IXposedHookLoadPackage {
     
     private static final String TAG = "InDriverBot";
     private static final String TARGET_PACKAGE = "sinet.startup.indriver";
+    private static final String TARGET_PACKAGE_ALT = "sinet.startup.inDriver";
     
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-        if (!lpparam.packageName.equals(TARGET_PACKAGE)) {
+        String packageName = lpparam.packageName;
+        
+        if (!packageName.equals(TARGET_PACKAGE) && !packageName.equals(TARGET_PACKAGE_ALT)) {
             return;
         }
         
-        XposedBridge.log(TAG + ": 🎯 Target found: " + lpparam.packageName);
+        XposedBridge.log(TAG + ": 🎯 Hooking package: " + packageName);
         
         try {
-            // Хук на создание приложения
             XposedHelpers.findAndHookMethod(
                 "android.app.Application",
                 lpparam.classLoader,
@@ -28,20 +30,20 @@ public class MainHook implements IXposedHookLoadPackage {
                 new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        XposedBridge.log(TAG + ": inDriver app started");
+                        XposedBridge.log(TAG + ": Application onCreate called");
                         setupHooks(lpparam);
                     }
                 }
             );
             
         } catch (Throwable t) {
-            XposedBridge.log(TAG + ": Error in init: " + t.getMessage());
+            XposedBridge.log(TAG + ": Initial hook error: " + t.getMessage());
         }
     }
     
     private void setupHooks(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
-            // 1. Обход оплаты объявлений (2030₸ -> 0₸)
+            // 1. Bypass announcement payment (2030₸ -> 0₸)
             XposedBridge.hookAllMethods(
                 Object.class,
                 "isAnnouncementPaid",
@@ -49,12 +51,12 @@ public class MainHook implements IXposedHookLoadPackage {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                         param.setResult(true);
-                        XposedBridge.log(TAG + ": 💰 Announcement payment bypassed");
+                        XposedBridge.log(TAG + ": ✅ Announcement payment bypassed");
                     }
                 }
             );
             
-            // 2. 25 бесплатных звонков
+            // 2. Free calls (25 calls/24h)
             XposedBridge.hookAllMethods(
                 Object.class,
                 "getRemainingCalls",
@@ -62,12 +64,12 @@ public class MainHook implements IXposedHookLoadPackage {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                         param.setResult(25);
-                        XposedBridge.log(TAG + ": 📞 25 free calls enabled");
+                        XposedBridge.log(TAG + ": ✅ 25 free calls enabled");
                     }
                 }
             );
             
-            // 3. Автопринятие заказов
+            // 3. Auto-accept orders
             XposedBridge.hookAllMethods(
                 Object.class,
                 "onNewOrder",
@@ -75,37 +77,39 @@ public class MainHook implements IXposedHookLoadPackage {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         XposedBridge.log(TAG + ": 📦 New order detected");
-                        autoAccept(param.args[0], lpparam.classLoader);
+                        autoAcceptOrder(param.args[0], lpparam.classLoader);
                     }
                 }
             );
             
-            // 4. Обход проверки root
-            XposedBridge.hookAllMethods(
-                Object.class,
-                "isRooted",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        param.setResult(false);
-                        XposedBridge.log(TAG + ": 🔒 Root check bypassed");
+            // 4. Bypass security checks
+            String[] securityChecks = {"isRooted", "isEmulator", "isXposedInstalled"};
+            for (String check : securityChecks) {
+                XposedBridge.hookAllMethods(
+                    Object.class,
+                    check,
+                    new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            param.setResult(false);
+                            XposedBridge.log(TAG + ": ✅ " + check + " bypassed");
+                        }
                     }
-                }
-            );
+                );
+            }
             
-            XposedBridge.log(TAG + ": ✅ All hooks installed successfully");
+            XposedBridge.log(TAG + ": ✅ All hooks set up successfully");
             
         } catch (Throwable t) {
-            XposedBridge.log(TAG + ": Hook setup failed: " + t.getMessage());
+            XposedBridge.log(TAG + ": ❌ Hook setup failed: " + t.getMessage());
         }
     }
     
-    private void autoAccept(Object order, ClassLoader cl) {
+    private void autoAcceptOrder(Object order, ClassLoader cl) {
         try {
             XposedBridge.log(TAG + ": 🤖 Auto-accepting order...");
-            // Симуляция принятия заказа
             Thread.sleep(100);
-            XposedBridge.log(TAG +): ✅ Order accepted!");
+            XposedBridge.log(TAG + ": ✅ Order accepted (simulated)");
         } catch (Exception e) {
             XposedBridge.log(TAG + ": Accept error: " + e.getMessage());
         }
