@@ -8,7 +8,7 @@ android {
     
     defaultConfig {
         applicationId "com.indriverbot"
-        minSdk 24
+        minSdk 21
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -21,7 +21,6 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
         }
         debug {
             minifyEnabled false
@@ -37,16 +36,15 @@ android {
     packagingOptions {
         exclude 'META-INF/**'
         exclude 'kotlin/**'
-        exclude 'okhttp3/**'
     }
 }
 
 dependencies {
-    // Локальный Xposed API JAR (который ты добавил в app/libs/)
-    implementation files('libs/api-82.jar')
+    // Xposed API - ВАЖНО: нужно скачать api-82.jar и положить в app/libs/
+    compileOnly files('libs/api-82.jar')
     
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'com.google.android.material:material:1.10.0'
     
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

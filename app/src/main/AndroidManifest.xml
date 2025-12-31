@@ -11,6 +11,7 @@
         android:supportsRtl="true"
         tools:ignore="HardcodedDebugMode,MissingApplicationIcon">
         
+        <!-- Xposed module metadata -->
         <meta-data
             android:name="xposedmodule"
             android:value="true" />

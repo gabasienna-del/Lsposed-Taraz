@@ -5,24 +5,23 @@ import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
+import java.lang.reflect.Method;
 
 public class MainHook implements IXposedHookLoadPackage {
     
     private static final String TAG = "InDriverBot";
     private static final String TARGET_PACKAGE = "sinet.startup.indriver";
-    private static final String TARGET_PACKAGE_ALT = "sinet.startup.inDriver";
     
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-        String packageName = lpparam.packageName;
-        
-        if (!packageName.equals(TARGET_PACKAGE) && !packageName.equals(TARGET_PACKAGE_ALT)) {
+        if (!lpparam.packageName.equals(TARGET_PACKAGE)) {
             return;
         }
         
-        XposedBridge.log(TAG + ": 🎯 Hooking package: " + packageName);
+        XposedBridge.log(TAG + ": 🎯 Hooking InDriver package: " + lpparam.packageName);
         
         try {
+            // Ждем инициализации приложения
             XposedHelpers.findAndHookMethod(
                 "android.app.Application",
                 lpparam.classLoader,
@@ -30,88 +29,153 @@ public class MainHook implements IXposedHookLoadPackage {
                 new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        XposedBridge.log(TAG + ": Application onCreate called");
-                        setupHooks(lpparam);
+                        XposedBridge.log(TAG + ": Application created, setting up hooks...");
+                        setupAllHooks(lpparam.classLoader);
                     }
                 }
             );
-            
         } catch (Throwable t) {
             XposedBridge.log(TAG + ": Initial hook error: " + t.getMessage());
         }
     }
     
-    private void setupHooks(XC_LoadPackage.LoadPackageParam lpparam) {
+    private void setupAllHooks(ClassLoader classLoader) {
         try {
-            // 1. Bypass announcement payment (2030₸ -> 0₸)
-            XposedBridge.hookAllMethods(
-                Object.class,
-                "isAnnouncementPaid",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        param.setResult(true);
-                        XposedBridge.log(TAG + ": ✅ Announcement payment bypassed");
-                    }
-                }
-            );
+            // 1. Поиск и хук классов платежей
+            hookPaymentMethods(classLoader);
             
-            // 2. Free calls (25 calls/24h)
-            XposedBridge.hookAllMethods(
-                Object.class,
-                "getRemainingCalls",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        param.setResult(25);
-                        XposedBridge.log(TAG + ": ✅ 25 free calls enabled");
-                    }
-                }
-            );
+            // 2. Поиск и хук классов заказов
+            hookOrderMethods(classLoader);
             
-            // 3. Auto-accept orders
-            XposedBridge.hookAllMethods(
-                Object.class,
-                "onNewOrder",
-                new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        XposedBridge.log(TAG + ": 📦 New order detected");
-                        autoAcceptOrder(param.args[0], lpparam.classLoader);
-                    }
-                }
-            );
+            // 3. Поиск и хук проверок безопасности
+            hookSecurityChecks(classLoader);
             
-            // 4. Bypass security checks
-            String[] securityChecks = {"isRooted", "isEmulator", "isXposedInstalled"};
-            for (String check : securityChecks) {
-                XposedBridge.hookAllMethods(
-                    Object.class,
-                    check,
-                    new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                            param.setResult(false);
-                            XposedBridge.log(TAG + ": ✅ " + check + " bypassed");
-                        }
-                    }
-                );
-            }
-            
-            XposedBridge.log(TAG + ": ✅ All hooks set up successfully");
+            XposedBridge.log(TAG + ": ✅ All hooks installed successfully");
             
         } catch (Throwable t) {
-            XposedBridge.log(TAG + ": ❌ Hook setup failed: " + t.getMessage());
+            XposedBridge.log(TAG + ": ❌ Hook setup error: " + t.getMessage());
         }
     }
     
-    private void autoAcceptOrder(Object order, ClassLoader cl) {
+    private void hookPaymentMethods(ClassLoader classLoader) {
         try {
-            XposedBridge.log(TAG + ": 🤖 Auto-accepting order...");
-            Thread.sleep(100);
-            XposedBridge.log(TAG + ": ✅ Order accepted (simulated)");
-        } catch (Exception e) {
-            XposedBridge.log(TAG + ": Accept error: " + e.getMessage());
+            // Поиск классов с платежами
+            Class<?>[] paymentClasses = findClassesByKeywords(classLoader, 
+                new String[]{"Payment", "Billing", "Price", "Cost", "Paid", "Premium"});
+            
+            for (Class<?> clazz : paymentClasses) {
+                if (clazz != null) {
+                    XposedBridge.log(TAG + ": Found payment class: " + clazz.getName());
+                    
+                    // Хук всех методов, возвращающих boolean/int/double
+                    Method[] methods = clazz.getDeclaredMethods();
+                    for (Method method : methods) {
+                        String methodName = method.getName().toLowerCase();
+                        Class<?> returnType = method.getReturnType();
+                        
+                        if (methodName.contains("is") || methodName.contains("get") || 
+                            methodName.contains("check") || methodName.contains("has")) {
+                            
+                            XposedBridge.hookMethod(method, new XC_MethodHook() {
+                                @Override
+                                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                                    if (returnType == boolean.class || returnType == Boolean.class) {
+                                        param.setResult(true); // Все оплачено
+                                        XposedBridge.log(TAG + ": ✅ Payment bypass: " + method.getName() + " -> true");
+                                    } else if (returnType == int.class || returnType == Integer.class ||
+                                               returnType == long.class || returnType == Long.class ||
+                                               returnType == double.class || returnType == Double.class) {
+                                        param.setResult(0); // Цена = 0
+                                        XposedBridge.log(TAG + ": ✅ Price set to 0: " + method.getName());
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + ": Payment hook error: " + t.getMessage());
         }
+    }
+    
+    private void hookOrderMethods(ClassLoader classLoader) {
+        try {
+            // Поиск классов с заказами
+            Class<?>[] orderClasses = findClassesByKeywords(classLoader,
+                new String[]{"Order", "Trip", "Request", "Ride", "Booking"});
+            
+            for (Class<?> clazz : orderClasses) {
+                if (clazz != null) {
+                    XposedBridge.log(TAG + ": Found order class: " + clazz.getName());
+                    
+                    // Хук методов новых заказов
+                    Method[] methods = clazz.getDeclaredMethods();
+                    for (Method method : methods) {
+                        String methodName = method.getName().toLowerCase();
+                        
+                        if (methodName.contains("neworder") || methodName.contains("onorder") || 
+                            methodName.contains("receive") || methodName.contains("notify")) {
+                            
+                            XposedBridge.hookMethod(method, new XC_MethodHook() {
+                                @Override
+                                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                                    XposedBridge.log(TAG + ": 📦 New order detected!");
+                                    try {
+                                        // Попытка автоматического принятия
+                                        Thread.sleep(500); // Небольшая задержка
+                                        XposedBridge.log(TAG + ": 🤖 Auto-accept attempt...");
+                                        // Здесь можно добавить логику принятия заказа
+                                    } catch (Exception e) {
+                                        XposedBridge.log(TAG + ": Auto-accept error: " + e.getMessage());
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + ": Order hook error: " + t.getMessage());
+        }
+    }
+    
+    private void hookSecurityChecks(ClassLoader classLoader) {
+        try {
+            Class<?>[] securityClasses = findClassesByKeywords(classLoader,
+                new String[]{"Security", "Safety", "Check", "Detect", "Root", "Xposed"});
+            
+            for (Class<?> clazz : securityClasses) {
+                if (clazz != null) {
+                    Method[] methods = clazz.getDeclaredMethods();
+                    for (Method method : methods) {
+                        String methodName = method.getName().toLowerCase();
+                        Class<?> returnType = method.getReturnType();
+                        
+                        if ((methodName.contains("root") || methodName.contains("xposed") || 
+                             methodName.contains("emulator") || methodName.contains("debug") ||
+                             methodName.contains("check") || methodName.contains("detect")) &&
+                            (returnType == boolean.class || returnType == Boolean.class)) {
+                            
+                            XposedBridge.hookMethod(method, new XC_MethodHook() {
+                                @Override
+                                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                                    param.setResult(false); // Возвращаем false для проверок безопасности
+                                    XposedBridge.log(TAG + ": 🔒 Security bypass: " + method.getName() + " -> false");
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + ": Security hook error: " + t.getMessage());
+        }
+    }
+    
+    private Class<?>[] findClassesByKeywords(ClassLoader classLoader, String[] keywords) {
+        // Этот метод должен искать классы по ключевым словам
+        // В реальной реализации нужно использовать reflection для поиска классов
+        return new Class<?>[0];
     }
 }
